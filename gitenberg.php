@@ -89,8 +89,19 @@ function fetch_single_github_markdown_file( $repo, $path, $branch = 'main' ) {
 
     $remote_content = base64_decode( $file->content );
 
-    return parse_blocks( $remote_content );
+    return $remote_content;
+
 }
+
+add_filter( 'rest_prepare_post', function( $response, $post, $request  ) {
+
+    if ( should_load_from_github( $response->data['content'], $post ) ) {
+        $remote_content = fetch_single_github_markdown_file( 'josephfusco/gitenberg', 'docs/some-tech-docs.md' );
+        $response->data['content']['raw'] = $remote_content;
+    }
+
+    return $response;
+}, 10, 3 );
 
 /**
  * Whether the post content should be loaded from Github or not
@@ -120,11 +131,6 @@ add_action( 'init', __NAMESPACE__ . '\\register_scripts', 10 );
  * Enqueues a script for the WordPress block editor.
  */
 function enqueue_block_editor_assets() {
-    $remote_content = fetch_single_github_markdown_file( 'josephfusco/gitenberg', 'docs/some-tech-docs.md' );
-
     wp_enqueue_script( 'gitenberg-editor' );
-    wp_localize_script( 'gitenberg-editor', 'gitenbergData', array(
-        'remoteContent' => $remote_content,
-    ));
 }
 add_action( 'enqueue_block_editor_assets', __NAMESPACE__ . '\\enqueue_block_editor_assets', 10 );
