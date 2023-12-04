@@ -5,6 +5,8 @@
  * Version: 1.0-beta.0.0.1
  */
 
+namespace Gitenberg;
+
 /**
  * Retrieves GitHub repository and access token, either from constants or WordPress options.
  *
@@ -43,7 +45,7 @@ function github_credentials_admin_notice() {
     </div>
     <?php
 }
-add_action( 'plugins_loaded', 'check_github_credentials' );
+add_action( 'plugins_loaded', __NAMESPACE__ . '\\check_github_credentials' );
 
 /**
  * Fetch a single markdown file from a GitHub repository.
@@ -87,31 +89,8 @@ function fetch_single_github_markdown_file( $repo, $path, $branch = 'main' ) {
 
     $remote_content = base64_decode( $file->content );
 
-    return $remote_content;
+    return parse_blocks( $remote_content );
 }
-
-/**
- * Loads markdown content into WordPress post content.
- *
- * @param string $content The post content.
- * @return string The modified post content.
- */
-function load_markdown_content( $content ) {
-    global $post;
-
-    if ( ! should_load_from_github( $content, $post ) ) {
-        return $content;
-    }
-
-    $remote_markdown_file = fetch_single_github_markdown_file( 'josephfusco/gitenberg', 'docs/some-tech-docs.md' );
-
-    if ( is_wp_error( $remote_markdown_file ) ) {
-        return $remote_markdown_file->get_error_message();
-    }
-
-    return $remote_markdown_file;
-}
-add_filter( 'the_content', 'load_markdown_content' );
 
 /**
  * Whether the post content should be loaded from Github or not
@@ -124,3 +103,28 @@ function should_load_from_github( $content, $post ) {
     $should = apply_filters( 'gitenberg/should_load_content_from_github', false, $content, $post );
     return true;
 }
+
+function register_scripts() {
+    wp_register_script(
+        'gitenberg-editor',
+        plugin_dir_url( __FILE__ ) . 'js/gitenberg-editor.js',
+        array( 'wp-blocks', 'wp-i18n', 'wp-element', 'wp-editor', 'wp-data', 'wp-dom-ready' ),
+        uniqid(),
+        true
+    );
+
+}
+add_action( 'init', __NAMESPACE__ . '\\register_scripts', 10 );
+
+/**
+ * Enqueues a script for the WordPress block editor.
+ */
+function enqueue_block_editor_assets() {
+    $remote_content = fetch_single_github_markdown_file( 'josephfusco/gitenberg', 'docs/some-tech-docs.md' );
+
+    wp_enqueue_script( 'gitenberg-editor' );
+    wp_localize_script( 'gitenberg-editor', 'gitenbergData', array(
+        'remoteContent' => $remote_content,
+    ));
+}
+add_action( 'enqueue_block_editor_assets', __NAMESPACE__ . '\\enqueue_block_editor_assets', 10 );
