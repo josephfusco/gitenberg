@@ -29,7 +29,7 @@ function check_github_credentials() {
     $credentials = get_github_credentials();
 
     if ( empty( $credentials['repo'] ) || empty( $credentials['token'] ) ) {
-        add_action( 'admin_notices', 'github_credentials_admin_notice' );
+        add_action( 'admin_notices', __NAMESPACE__ . '\\github_credentials_admin_notice' );
     }
 }
 
