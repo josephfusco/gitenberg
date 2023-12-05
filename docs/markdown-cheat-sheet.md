@@ -21,7 +21,7 @@
 <!-- /wp:list -->
 
 <!-- wp:paragraph -->
-<p>They like to eat.</p>
+<p>They like to sleeeeeeeeeeeeep.</p>
 <!-- /wp:paragraph -->
 
 <!-- wp:image {"id":42,"aspectRatio":"1","scale":"cover","sizeSlug":"large","linkDestination":"none","className":"is-style-default"} -->
