@@ -295,3 +295,17 @@ function get_linked_markdown_file( $post_id ) {
 
     return $post_meta;
 }
+
+function register_meta() {
+    $post_type = 'post';
+    $meta_key  = 'gitenberg_linked_markdown_file';
+    $args      = [
+        'type'         => 'string',
+        'description'  => __( 'The markdown file from the selected GitHub repository that this post should load its content from.', 'gitenberg' ),
+        'show_in_rest' => true,
+        'single'       => true,
+    ];
+
+    register_post_meta( $post_type, $meta_key, $args );
+}
+add_action( 'init', __NAMESPACE__ . '\\register_meta', 10 );

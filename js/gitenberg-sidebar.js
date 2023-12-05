@@ -7,31 +7,31 @@
     var PluginDocumentSettingPanel = wp.editPost.PluginDocumentSettingPanel;
 
     var GitenbergFileSelector = function( props ) {
-        var markdownFiles = window.gitenbergData.markdownFiles || [];
-        var linkedMarkdownFile = window.gitenbergData.linkedMarkdownFile;
-        var onUpdateMeta = props.onUpdateMeta;
+        const markdownFiles = window.gitenbergData.markdownFiles || [];
+        const meta = wp.data.select('core/editor').getEditedPostAttribute( 'meta' );
+        const onUpdateMeta = props.onUpdateMeta;
+        const { gitenberg_linked_markdown_file: selectedFile } = meta;
 
         return el(
             PluginDocumentSettingPanel,
             {
                 name: 'gitenberg-file-selector',
-                title: 'Gitenberg',
+                title: 'Gitenberg Markdown Files',
                 className: 'gitenberg-file-selector'
             },
             el(
                 SelectControl,
                 {
                     label: __('Select a Markdown file'),
-                    value: linkedMarkdownFile || props.selectedFile,
-                    options: [{ label: 'Select...', value: '' }].concat(
+                    value: selectedFile,
+                    options: [{ label: 'None', value: '' }].concat(
                         markdownFiles.map( function( file ) {
-                            return {
-                                label: file.name,
-                                value: file.path
-                            };
+                            return { label: file.name, value: file.path };
                         })
                     ),
-                    onChange: onUpdateMeta
+                    onChange: function( value ) {
+                        onUpdateMeta( value );
+                    }
                 }
             )
         );
@@ -40,14 +40,14 @@
     var mapStateToProps = function( select ) {
         var postMeta = select( 'core/editor' ).getEditedPostAttribute( 'meta' );
         return {
-            selectedFile: postMeta ? postMeta['_gitenberg_selected_file'] : ''
+            selectedFile: postMeta ? postMeta['gitenberg_linked_markdown_file'] : ''
         };
     };
 
     var mapDispatchToProps = function( dispatch ) {
         return {
             onUpdateMeta: function( markdownFilePath ) {
-                dispatch( 'core/editor' ).editPost( { meta: { _gitenberg_selected_file: markdownFilePath } } );
+                dispatch( 'core/editor' ).editPost( { meta: { gitenberg_linked_markdown_file: markdownFilePath } } );
             }
         };
     };
