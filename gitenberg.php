@@ -166,14 +166,13 @@ function modify_rest_api_response( $response, $post, $request ) {
     }
 
     $linked_file = get_linked_markdown_file( $post->ID );
-    
+
     if ( ! $linked_file ) {
         return $response; // Return the unmodified response.
     }
 
     if ( should_load_from_github( $response->data['content'], $post ) ) {
-        // TODO: load markdown file path from post meta (docs/some-tech-docs.md)
-        $remote_content = fetch_single_github_markdown_file( $config['repo'], 'docs/some-tech-docs.md' );
+        $remote_content = fetch_single_github_markdown_file( $config['repo'], $linked_file );
 
         if ( is_wp_error( $remote_content ) ) {
             return $response;  // Return the unmodified response.

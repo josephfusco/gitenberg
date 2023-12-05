@@ -47,7 +47,21 @@
     var mapDispatchToProps = function( dispatch ) {
         return {
             onUpdateMeta: function( markdownFilePath ) {
-                dispatch( 'core/editor' ).editPost( { meta: { gitenberg_linked_markdown_file: markdownFilePath } } );
+                // TODO: Completely wiping out the original content is temporary for demonstration purposes.
+                // Ideally the plugin would capture the post content when a user first selects a markdown file, and return that content if they select "None".
+
+                if ('' === markdownFilePath) { // "None"
+                    dispatch( 'core/editor').editPost({
+                        content: ''
+                    })
+                }
+
+                dispatch( 'core/editor' ).editPost({
+                    meta: {
+                        gitenberg_linked_markdown_file: markdownFilePath
+                    },
+                });
+                dispatch( 'core/editor' ).savePost();
             }
         };
     };
