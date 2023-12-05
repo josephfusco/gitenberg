@@ -86,8 +86,12 @@ function fetch_single_github_markdown_file( $repo, $path, $branch = 'main' ) {
         return $response;
     }
 
-    $file = wp_remote_retrieve_body( $response );    
-    $file = json_decode( $file );
+    $body = wp_remote_retrieve_body( $response );    
+    $file = json_decode( $body );
+
+    if ( ! isset( $file->sha ) ) {
+        return new WP_Error( 'github_api_error', 'Invalid or missing sha returned from GitHub API' );
+    }
 
     if ( ! isset( $file->name ) || pathinfo( $file->name, PATHINFO_EXTENSION ) !== 'md' ) {
         return new WP_Error( 'github_api_error', 'Invalid or non-markdown file received from GitHub API' );
@@ -97,9 +101,9 @@ function fetch_single_github_markdown_file( $repo, $path, $branch = 'main' ) {
         return new WP_Error( 'github_api_error', 'No content found for markdown file received from GitHub API' );
     }
 
-    $remote_content = base64_decode( $file->content );
+    // $remote_content = base64_decode( $file->content );
 
-    return $remote_content;
+    return $file;
 }
 
 /**
@@ -172,13 +176,16 @@ function modify_rest_api_response( $response, $post, $request ) {
     }
 
     if ( should_load_from_github( $response->data['content'], $post ) ) {
-        $remote_content = fetch_single_github_markdown_file( $config['repo'], $linked_file );
+        $remote_file = fetch_single_github_markdown_file( $config['repo'], $linked_file );
 
-        if ( is_wp_error( $remote_content ) ) {
+        if ( is_wp_error( $remote_file ) ) {
             return $response;  // Return the unmodified response.
         }
         
+        $remote_content = base64_decode( $remote_file->content );
         $response->data['content']['raw'] = $remote_content;
+
+        update_post_meta( $post->ID, 'gitenberg_linked_markdown_file_sha', $remote_file->sha );
     }
 
     return $response;
@@ -193,8 +200,9 @@ function register_rest_routes() {
         'gitenberg/v1',
         '/list-markdown-files',
         array(
-            'methods'  => 'GET',
-            'callback' => __NAMESPACE__ . '\\list_markdown_files_rest_handler',
+            'methods'             => 'GET',
+            'callback'            => __NAMESPACE__ . '\\list_markdown_files_rest_handler',
+            'permission_callback' => '__return_true', // TODO: Better permissions.
         )
     );
 }
@@ -225,9 +233,55 @@ function should_load_from_github( $content, $post ) {
  * @param bool     $update  Whether this is an existing post being updated or not.
  */
 function save_post_content( $post_id, $post, $update ) {
+    if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) 
+        return;
+    if ( !current_user_can( 'edit_post', $post_id ) )
+        return;
+    if ( wp_is_post_revision( $post_id ) )
+        return;
 
+    $config = get_gitenberg_config();
+    if ( is_wp_error( $config ) ) {
+        return;
+    }
+
+    $content = get_post_field( 'post_content', $post_id );
+    $filename = get_linked_markdown_file( $post_id );
+
+    if ( '' === $filename ) {
+        return; // "None"
+    }
+
+    // TODO: if filename === create-new, we should do a POST request instead of a PUT, and generate a slug for the markdown filename.
+
+    $github_api_url = 'https://api.github.com/repos/' . $config['repo'] . '/contents/' . $filename;
+
+    $data = array(
+        'message' => 'Update from WordPress',
+        'content' => base64_encode( $content ),
+        'branch'  => 'main',
+        'sha'     => get_linked_markdown_file_sha( $post_id ),
+    );
+
+    $headers = array(
+        'Authorization' => 'token ' . $config['token'],
+        'Content-Type'  => 'application/json',
+    );
+
+    $response = wp_remote_post( $github_api_url, array(
+        'method'    => 'PUT',
+        'headers'   => $headers,
+        'body'      => json_encode( $data ),
+        'timeout'   => 15
+    ) );
+
+    if ( is_wp_error( $response ) ) {
+        wp_send_json( $response );
+    } else {
+        wp_send_json( $response );
+    }
 }
-add_filter( 'save_post', __NAMESPACE__ . '\\save_post_content', 10, 3 );
+add_action( 'save_post', __NAMESPACE__ . '\\save_post_content', 10, 3 );
 
 /**
  * Enqueue JavaScript for Gutenberg sidebar customization.
@@ -293,6 +347,22 @@ function get_linked_markdown_file( $post_id ) {
     }
 
     return $post_meta;
+}
+
+function get_linked_markdown_file_sha( $post_id ) {
+    if ( ! get_post_status( $post_id ) ) {
+        // Post does not exist
+        return null;
+    }
+
+    $sha = get_post_meta( $post_id, 'gitenberg_linked_markdown_file_sha', true );
+
+    if ( empty( $sha ) ) {
+        // Sha is empty or does not exist
+        return null;
+    }
+
+    return $sha;
 }
 
 function register_meta() {
