@@ -220,26 +220,32 @@ function should_load_from_github( $content, $post ) {
     return true;
 }
 
-/**
- * Handles custom operations when a post is saved or updated.
- *
- * This function is hooked into the 'save_post' action and is triggered
- * whenever a post or a page is created or updated. It can be used to
- * perform additional operations like saving custom meta data, performing
- * checks, or triggering other actions based on the post update.
- *
- * @param int      $post_id The ID of the post being saved.
- * @param WP_Post  $post    The post object.
- * @param bool     $update  Whether this is an existing post being updated or not.
- */
-function save_post_content( $post_id, $post, $update ) {
+function save_post_content( $new_status, $old_status, $post ) {
     if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) 
         return;
-    if ( !current_user_can( 'edit_post', $post_id ) )
+    if ( !current_user_can( 'edit_post', $post->ID ) )
         return;
-    if ( wp_is_post_revision( $post_id ) )
+    if ( wp_is_post_revision( $post->ID ) )
         return;
 
+    $initial_post_statuses = [ 'auto-draft', 'inherit', 'new' ];
+
+    // If the post is a fresh post that hasn't been made public, don't track the action
+    if ( in_array( $new_status, $initial_post_statuses, true ) ) {
+        return;
+    }
+
+    // Updating a draft should not log actions
+    if ( 'draft' === $new_status && 'draft' === $old_status ) {
+        return;
+    }
+
+    // If the post isn't coming from a "publish" state or going to a "publish" state
+    // we can ignore the action.
+    if ( 'publish' !== $old_status && 'publish' !== $new_status ) {
+        return;
+    }
+    
     $config = get_gitenberg_config();
     if ( is_wp_error( $config ) ) {
         return;
@@ -281,7 +287,7 @@ function save_post_content( $post_id, $post, $update ) {
         // Handle success.
     }
 }
-add_action( 'save_post', __NAMESPACE__ . '\\save_post_content', 10, 3 );
+add_action( 'transition_post_status', __NAMESPACE__ . '\\save_post_content', 10, 3 );
 
 /**
  * Enqueue JavaScript for Gutenberg sidebar customization.
