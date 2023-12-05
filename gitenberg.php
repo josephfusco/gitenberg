@@ -251,8 +251,8 @@ function save_post_content( $new_status, $old_status, $post ) {
         return;
     }
 
-    $content = get_post_field( 'post_content', $post_id );
-    $filename = get_linked_markdown_file( $post_id );
+    $content = get_post_field( 'post_content', $post->ID );
+    $filename = get_linked_markdown_file( $post->ID );
 
     if ( '' === $filename ) {
         return; // "None"
@@ -266,7 +266,7 @@ function save_post_content( $new_status, $old_status, $post ) {
         'message' => 'Update from WordPress',
         'content' => base64_encode( $content ),
         'branch'  => 'main',
-        'sha'     => get_linked_markdown_file_sha( $post_id ),
+        'sha'     => get_linked_markdown_file_sha( $post->ID ),
     );
 
     $headers = array(
