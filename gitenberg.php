@@ -86,7 +86,7 @@ function fetch_single_github_markdown_file( $repo, $path, $branch = 'main' ) {
         return $response;
     }
 
-    $body = wp_remote_retrieve_body( $response );    
+    $body = wp_remote_retrieve_body( $response );
     $file = json_decode( $body );
 
     if ( ! isset( $file->sha ) ) {
