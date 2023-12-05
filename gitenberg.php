@@ -276,9 +276,9 @@ function save_post_content( $post_id, $post, $update ) {
     ) );
 
     if ( is_wp_error( $response ) ) {
-        wp_send_json( $response );
+        // Handle error.
     } else {
-        wp_send_json( $response );
+        // Handle success.
     }
 }
 add_action( 'save_post', __NAMESPACE__ . '\\save_post_content', 10, 3 );
