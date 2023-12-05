@@ -2,7 +2,8 @@
 /**
  * Plugin Name: Gitenberg
  * Description: Edit Github Markdown files using WordPress and the Gutenberg block-based editor.
- * Version: 1.0-beta.0.0.1
+ * Version:     1.0-beta.0.0.1
+ * Author:      Jason Bahl, Joseph Fusco
  */
 
 namespace Gitenberg;
@@ -74,9 +75,7 @@ function fetch_single_github_markdown_file( $repo, $path, $branch = 'main' ) {
         return $response;
     }
 
-    $file    = wp_remote_retrieve_body( $response );
-    $headers = wp_remote_retrieve_headers( $response );
-    
+    $file = wp_remote_retrieve_body( $response );    
     $file = json_decode( $file );
 
     if ( ! isset( $file->name ) || pathinfo( $file->name, PATHINFO_EXTENSION ) !== 'md' ) {
@@ -93,15 +92,28 @@ function fetch_single_github_markdown_file( $repo, $path, $branch = 'main' ) {
 
 }
 
-add_filter( 'rest_prepare_post', function( $response, $post, $request  ) {
-
+/**
+ * Modifies the REST API response for posts.
+ *
+ * Checks if the post content should be loaded from GitHub. If so,
+ * it fetches the content from a specified GitHub markdown file and
+ * updates the post content in the REST API response.
+ *
+ * @param WP_REST_Response $response The response object.
+ * @param WP_Post          $post     The post object being returned.
+ * @param WP_REST_Request  $request  The request object.
+ *
+ * @return WP_REST_Response The modified response object.
+ */
+function modify_rest_api_response( $response, $post, $request ) {
     if ( should_load_from_github( $response->data['content'], $post ) ) {
         $remote_content = fetch_single_github_markdown_file( 'josephfusco/gitenberg', 'docs/some-tech-docs.md' );
         $response->data['content']['raw'] = $remote_content;
     }
 
     return $response;
-}, 10, 3 );
+}
+add_filter( 'rest_prepare_post', __NAMESPACE__ . '\\modify_rest_api_response', 10, 3 );
 
 /**
  * Whether the post content should be loaded from Github or not
@@ -115,22 +127,22 @@ function should_load_from_github( $content, $post ) {
     return true;
 }
 
-function register_scripts() {
-    wp_register_script(
-        'gitenberg-editor',
-        plugin_dir_url( __FILE__ ) . 'js/gitenberg-editor.js',
-        array( 'wp-blocks', 'wp-i18n', 'wp-element', 'wp-editor', 'wp-data', 'wp-dom-ready' ),
-        uniqid(),
-        true
-    );
 
-}
-add_action( 'init', __NAMESPACE__ . '\\register_scripts', 10 );
+// function register_scripts() {
+//     wp_register_script(
+//         'gitenberg-editor',
+//         plugin_dir_url( __FILE__ ) . 'js/gitenberg-editor.js',
+//         array( 'wp-blocks', 'wp-i18n', 'wp-element', 'wp-editor', 'wp-data', 'wp-dom-ready' ),
+//         uniqid(),
+//         true
+//     );
+// }
+// add_action( 'init', __NAMESPACE__ . '\\register_scripts', 10 );
 
-/**
- * Enqueues a script for the WordPress block editor.
- */
-function enqueue_block_editor_assets() {
-    wp_enqueue_script( 'gitenberg-editor' );
-}
-add_action( 'enqueue_block_editor_assets', __NAMESPACE__ . '\\enqueue_block_editor_assets', 10 );
+// /**
+//  * Enqueues a script for the WordPress block editor.
+//  */
+// function enqueue_block_editor_assets() {
+//     wp_enqueue_script( 'gitenberg-editor' );
+// }
+// add_action( 'enqueue_block_editor_assets', __NAMESPACE__ . '\\enqueue_block_editor_assets', 10 );
