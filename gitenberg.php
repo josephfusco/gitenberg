@@ -12,12 +12,16 @@ use WP_Error;
 /**
  * Retrieves GitHub repository and access token, either from constants or WordPress options.
  *
- * @return array Contains repository URL and access token.
+ * @return array|WP_Error Contains repository URL and access token.
  */
 function get_gitenberg_config() {
     $repo       = defined( 'GITENBERG_GITHUB_REPO' ) ? GITENBERG_GITHUB_REPO : get_option( 'gitenberg_github_repo', '' );
     $token      = defined( 'GITENBERG_GITHUB_PERSONAL_ACCESS_TOKEN' ) ? GITENBERG_GITHUB_PERSONAL_ACCESS_TOKEN : get_option( 'gitenberg_github_personal_access_token', '' );
     $remote_dir = defined( 'GITENBERG_GITHUB_REMOTE_DIR' ) ? GITENBERG_GITHUB_REMOTE_DIR : get_option( 'gitenberg_github_remote_dir', 'docs' );
+
+    if ( empty( $repo ) || empty( $token ) ) {
+        return new WP_Error( 'The GITENBERG_GITHUB_REPO and GITENBERG_GITHUB_PERSONAL_ACCESS_TOKEN are required for the Gitenberg plugin to function properly. Please define them in your wp-config.php file or set them in the WordPress options.' );
+    }
 
     return array(
         'repo'       => $repo,
@@ -29,27 +33,27 @@ function get_gitenberg_config() {
 /**
  * Checks if necessary GitHub constants or options are set and displays an admin notice if not.
  */
-function check_github_credentials() {
+function maybe_display_admin_notice() {
     $config = get_gitenberg_config();
 
-    if ( empty( $config['repo'] ) || empty( $config['token'] ) ) {
-        add_action( 'admin_notices', __NAMESPACE__ . '\\github_credentials_admin_notice' );
+    if ( is_wp_error( $config ) ) {
+        add_action( 'admin_notices', __NAMESPACE__ . '\\display_admin_notice' );
     }
 }
+add_action( 'plugins_loaded', __NAMESPACE__ . '\\maybe_display_admin_notice' );
 
 /**
  * Displays an admin notice about missing GitHub credentials.
  */
-function github_credentials_admin_notice() {
+function display_admin_notice() {
     ?>
     <div class="notice notice-error">
         <p>
-            The <code>GITHUB_REPO</code> and <code>GITHUB_ACCESS_TOKEN</code> are required for the <strong>Gitenberg</strong> plugin to function properly. Please define them in your wp-config.php file or set them in the WordPress options.
+            The <code>GITENBERG_GITHUB_REPO</code> and <code>GITENBERG_GITHUB_PERSONAL_ACCESS_TOKEN</code> are required for the <strong>Gitenberg</strong> plugin to function properly. Please define them in your wp-config.php file or set them in the WordPress options.
         </p>
     </div>
     <?php
 }
-add_action( 'plugins_loaded', __NAMESPACE__ . '\\check_github_credentials' );
 
 /**
  * Fetch a single markdown file from a GitHub repository.
@@ -61,6 +65,10 @@ add_action( 'plugins_loaded', __NAMESPACE__ . '\\check_github_credentials' );
  */
 function fetch_single_github_markdown_file( $repo, $path, $branch = 'main' ) {
     $config = get_gitenberg_config();
+
+    if ( is_wp_error( $config ) ) {
+        return $config; // Return WP_Error
+    }
 
     $api_url = 'https://api.github.com/repos/' . $repo . '/contents/' . $path . '?ref=' . $branch;
 
@@ -92,21 +100,18 @@ function fetch_single_github_markdown_file( $repo, $path, $branch = 'main' ) {
     $remote_content = base64_decode( $file->content );
 
     return $remote_content;
-
 }
 
+/**
+ * Retrieves and lists markdown files from a specified GitHub repository, showing only name and path.
+ *
+ * @return array|WP_Error List of markdown files with name and path, or WP_Error on failure.
+ */
 function list_markdown_files() {
     $config = get_gitenberg_config();
 
-    $repo       = $config['repo'];
-    $remote_dir = $config['remote_dir'];
-
-    if ( empty( $repo ) ) {
-        return new WP_Error( 'Missing repo' );
-    }
-
-    if ( empty( $remote_dir ) ) {
-        return new WP_Error( 'Missing remote_dir' );
+    if ( is_wp_error( $config ) ) {
+        return $config; // Return WP_Error
     }
 
     $headers = array(
@@ -114,14 +119,26 @@ function list_markdown_files() {
         'Accept'        => 'application/vnd.github.v3+json',
     );
 
-    $api_url  = "https://api.github.com/repos/$repo/contents/$remote_dir";
+    $api_url  = 'https://api.github.com/repos/' . $config['repo'] . '/contents/' . $config['remote_dir'];
     $response = wp_remote_get( $api_url, array( 'headers' => $headers ) );
 
     if ( is_wp_error( $response ) ) {
         return new WP_Error( $response->get_error_message() );
     }
 
-    return json_decode( wp_remote_retrieve_body( $response ), true );
+    $files = json_decode( wp_remote_retrieve_body( $response ), true );
+
+    if ( empty( $files ) ) {
+        return [];
+    }
+
+    // Extract only the 'name' and 'path' from each file
+    return array_map( function ( $file ) {
+        return [
+            'name' => $file['name'],
+            'path' => $file['path']
+        ];
+    }, $files );
 }
 
 function list_markdown_files_rest_handler( $request ) {
@@ -142,16 +159,26 @@ function list_markdown_files_rest_handler( $request ) {
  * @return WP_REST_Response The modified response object.
  */
 function modify_rest_api_response( $response, $post, $request ) {
-    $config      = get_gitenberg_config();
+    $config = get_gitenberg_config();
+
+    if ( is_wp_error( $config ) ) {
+        return $response; // Return the unmodified response.
+    }
+
     $linked_file = get_linked_markdown_file( $post->ID );
     
     if ( ! $linked_file ) {
-        return $response; // Return the unmodified response
+        return $response; // Return the unmodified response.
     }
 
     if ( should_load_from_github( $response->data['content'], $post ) ) {
         // TODO: load markdown file path from post meta (docs/some-tech-docs.md)
         $remote_content = fetch_single_github_markdown_file( $config['repo'], 'docs/some-tech-docs.md' );
+
+        if ( is_wp_error( $remote_content ) ) {
+            return $response;  // Return the unmodified response.
+        }
+        
         $response->data['content']['raw'] = $remote_content;
     }
 
@@ -207,8 +234,20 @@ add_filter( 'save_post', __NAMESPACE__ . '\\save_post_content', 10, 3 );
  * Enqueue JavaScript for Gutenberg sidebar customization.
  */
 function enqueue_gitenberg_scripts() {
+    $config = get_gitenberg_config();
+
+    if ( is_wp_error( $config ) ) {
+        return null;
+    }
+
     $current_screen = get_current_screen();
     global $post;
+
+    $markdown_files = list_markdown_files();
+
+    if ( is_wp_error( $markdown_files ) ) {
+        $markdown_files = [];
+    }
 
     if ( ! ( function_exists( 'use_block_editor_for_post_type' ) &&
              use_block_editor_for_post_type( $current_screen->post_type ) ) ) {
@@ -222,11 +261,13 @@ function enqueue_gitenberg_scripts() {
         filemtime( plugin_dir_path( __FILE__ ) . 'js/gitenberg-sidebar.js' )
     );
 
+
     wp_localize_script(
         'gitenberg-sidebar-script',
         'gitenbergData',
         array(
-            'markdownFiles'      => list_markdown_files(),
+            'repo'               => $config['repo'],
+            'markdownFiles'      => $markdown_files,
             'linkedMarkdownFile' => get_linked_markdown_file( $post->ID )
         )
     );
