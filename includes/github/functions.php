@@ -8,6 +8,7 @@
 namespace Gitenberg\GitHub;
 
 use function Gitenberg\Config\get_plugin_config;
+use WP_Error;
 
 /**
  * Whether the post content should be loaded from Github or not
@@ -92,6 +93,12 @@ function list_remote_markdown_files() {
 
     if ( is_wp_error( $response ) ) {
         return new WP_Error( $response->get_error_message() );
+    }
+
+    // Check for a 404 response
+    $response_code = wp_remote_retrieve_response_code( $response );
+    if ( $response_code == 404 ) {
+        return new WP_Error( 'github_api_error', 'GitHub API returned a 404 Not Found response.' );
     }
 
     $files = json_decode( wp_remote_retrieve_body( $response ), true );
