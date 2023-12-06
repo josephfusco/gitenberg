@@ -12,6 +12,21 @@ use function Gitenberg\Admin\get_linked_markdown_file;
 use function Gitenberg\Admin\get_linked_markdown_file_sha;
 
 /**
+ * Add a settings page to the WordPress admin menu.
+ */
+function add_settings_page() {
+    add_submenu_page(
+        'options-general.php', // WordPress Settings
+        __( 'Gitenberg Settings', 'gitenberg' ),
+        __( 'Gitenberg', 'gitenberg' ),
+        'manage_options',
+        'gitenberg-settings',
+        __NAMESPACE__ . '\\display_settings_page'
+    );
+}
+add_action( 'admin_menu', __NAMESPACE__ . '\\add_settings_page' );
+
+/**
  * Checks if necessary GitHub constants or options are set and displays an admin notice if not.
  */
 function maybe_display_admin_notice() {

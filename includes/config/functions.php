@@ -18,7 +18,9 @@ function get_plugin_config() {
     $remote_dir = defined( 'GITENBERG_GITHUB_REMOTE_DIR' ) ? GITENBERG_GITHUB_REMOTE_DIR : get_option( 'gitenberg_github_remote_dir', 'docs' );
 
     if ( empty( $repo ) || empty( $token ) ) {
-        return new WP_Error( 'The GITENBERG_GITHUB_REPO and GITENBERG_GITHUB_PERSONAL_ACCESS_TOKEN are required for the Gitenberg plugin to function properly. Please define them in your wp-config.php file or set them in the WordPress options.' );
+        return new WP_Error(
+            __( 'The GITENBERG_GITHUB_REPO and GITENBERG_GITHUB_PERSONAL_ACCESS_TOKEN are required for the Gitenberg plugin to function properly. Please define them in your wp-config.php file or set them in the WordPress options.', 'gitenberg' )
+        );
     }
 
     return array(

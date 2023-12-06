@@ -1,0 +1,10 @@
+{
+  "private": true,
+  "scripts": {
+    "start": "wp-scripts start",
+    "build": "wp-scripts build"
+  },
+  "devDependencies": {
+    "@wordpress/scripts": "^26.18.0"
+  }
+}

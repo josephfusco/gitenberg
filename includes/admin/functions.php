@@ -10,21 +10,38 @@ namespace Gitenberg\Admin;
 /**
  * HTML template for admin notice about missing GitHub credentials.
  */
-function get_admin_notice_html() {
-    return '
+function admin_notice_html() {
+    return <<<HTML
         <div class="notice notice-error">
             <p>
                 The <code>GITENBERG_GITHUB_REPO</code> and <code>GITENBERG_GITHUB_PERSONAL_ACCESS_TOKEN</code> are required for the <strong>Gitenberg</strong> plugin to function properly. Please define them in your wp-config.php file or set them in the WordPress options.
             </p>
         </div>
-    ';
+        HTML;
+}
+
+/**
+ * Callback function to display the HTML content of the settings page.
+ */
+function settings_page_html() {
+    return <<<HTML
+        <div id="gitenberg-settings"></div>
+        HTML;
 }
 
 /**
  * Displays an admin notice about missing GitHub credentials.
  */
 function display_admin_notice() {
-    echo get_admin_notice_html();
+    echo admin_notice_html();
+}
+
+
+/**
+ * Displays the settings page.
+ */
+function display_settings_page() {
+    echo settings_page_html();
 }
 
 /**

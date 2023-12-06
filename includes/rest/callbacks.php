@@ -1,6 +1,6 @@
 <?php
 /**
- * Callback functions for REST API.
+ * Callback functions for the WP REST API.
  * 
  * @package Gitenberg\API
  */
@@ -23,21 +23,37 @@ function register_rest_routes() {
         array(
             'methods'             => 'GET',
             'callback'            => __NAMESPACE__ . '\\list_markdown_files_rest_handler',
-            'permission_callback' => '__return_true', // TODO: Better permissions.
+            'permission_callback' => function() {
+                return current_user_can( 'manage_options' );
+            }
+        )
+    );
+
+    register_rest_route(
+        'gitenberg/v1',
+        '/settings',
+        array(
+            'methods'             => 'GET',
+            'callback'            => __NAMESPACE__ . '\\get_gitenberg_settings',
+            'permission_callback' => function() {
+                return current_user_can( 'manage_options' );
+            }
+        )
+    );
+
+    register_rest_route(
+        'gitenberg/v1',
+        '/settings',
+        array(
+            'methods'             => 'POST',
+            'callback'            => __NAMESPACE__ . '\\update_gitenberg_settings',
+            'permission_callback' => function() {
+                return current_user_can( 'manage_options' );
+            }
         )
     );
 }
 add_action( 'rest_api_init', __NAMESPACE__ . '\\register_rest_routes' );
-
-/**
- * REST API callback to list markdown files.
- *
- * @param WP_REST_Request $request The REST request object.
- * @return array|WP_Error List of markdown files with name and path, or WP_Error on failure.
- */
-function list_markdown_files_rest_handler( $request ) {
-    return list_remote_markdown_files();
-}
 
 /**
  * Modifies the REST API response for posts to load the GitHub markdown.
