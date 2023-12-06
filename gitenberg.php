@@ -3,7 +3,7 @@
  * Plugin Name: Gitenberg
  * Description: Edit Github Markdown files using WordPress and the Gutenberg block-based editor.
  * Author:      Jason Bahl, Joseph Fusco
- * Version:     1.0-beta.1
+ * Version:     1.0.0-beta.1
  * Text Domain: gitenberg
  */
 
